@@ -1,6 +1,9 @@
 package com.miniatc.mobile
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -13,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -34,12 +38,17 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MiniATCApp() {
+    val context = LocalContext.current
+
     var callsign by remember { mutableStateOf("AFR123") }
     var aircraft by remember { mutableStateOf("A320") }
     var departure by remember { mutableStateOf("FMEE") }
     var destination by remember { mutableStateOf("FMMI") }
     var altitude by remember { mutableStateOf("FL350") }
-    var status by remember { mutableStateOf("EN ATTENTE DU PLAN DE VOL") }
+
+    var status by remember {
+        mutableStateOf("EN ATTENTE DU PLAN DE VOL")
+    }
 
     MaterialTheme {
         Column(
@@ -58,7 +67,7 @@ fun MiniATCApp() {
             )
 
             Text(
-                "FLIGHT ASSISTANT  •  VERSION 1.0",
+                "FLIGHT ASSISTANT • VERSION 1.0",
                 color = Color.LightGray,
                 fontSize = 11.sp
             )
@@ -66,10 +75,13 @@ fun MiniATCApp() {
             HorizontalDivider(color = Cyan.copy(alpha = 0.4f))
 
             Card(
-                colors = CardDefaults.cardColors(containerColor = Panel),
+                colors = CardDefaults.cardColors(
+                    containerColor = Panel
+                ),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Column(Modifier.padding(16.dp)) {
+
                     Text(
                         "FLIGHT PLAN",
                         color = Cyan,
@@ -78,21 +90,39 @@ fun MiniATCApp() {
 
                     Spacer(Modifier.height(12.dp))
 
-                    FlightField("CALLSIGN", callsign) { callsign = it }
-                    FlightField("AIRCRAFT", aircraft) { aircraft = it }
-                    FlightField("DEPARTURE (ICAO)", departure) { departure = it }
-                    FlightField("DESTINATION (ICAO)", destination) {
-                        destination = it
+                    FlightField("CALLSIGN", callsign) {
+                        callsign = it
                     }
+
+                    FlightField("AIRCRAFT", aircraft) {
+                        aircraft = it
+                    }
+
+                    FlightField("DEPARTURE (ICAO)", departure) {
+                        departure = it.uppercase()
+                    }
+
+                    FlightField("DESTINATION (ICAO)", destination) {
+                        destination = it.uppercase()
+                    }
+
                     FlightField("CRUISE ALTITUDE", altitude) {
-                        altitude = it
+                        altitude = it.uppercase()
                     }
 
                     Spacer(Modifier.height(14.dp))
 
                     Button(
                         onClick = {
-                            status = "PLAN PRÉPARÉ : $callsign"
+                            status = if (
+                                departure.matches(Regex("[A-Z]{4}")) &&
+                                destination.matches(Regex("[A-Z]{4}")) &&
+                                departure != destination
+                            ) {
+                                "PLAN PRÉPARÉ : $callsign"
+                            } else {
+                                "VÉRIFIE LES AÉROPORTS ICAO"
+                            }
                         },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(
@@ -100,16 +130,22 @@ fun MiniATCApp() {
                             contentColor = Background
                         )
                     ) {
-                        Text("PREPARE FLIGHT", fontWeight = FontWeight.Bold)
+                        Text(
+                            "PREPARE FLIGHT",
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
 
             Card(
-                colors = CardDefaults.cardColors(containerColor = Panel),
+                colors = CardDefaults.cardColors(
+                    containerColor = Panel
+                ),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Column(Modifier.padding(16.dp)) {
+
                     Text(
                         "ATC CONTROL",
                         color = Cyan,
@@ -130,10 +166,48 @@ fun MiniATCApp() {
                         fontWeight = FontWeight.Bold
                     )
 
+                    Spacer(Modifier.height(16.dp))
+
+                    Button(
+                        onClick = {
+                            if (Settings.canDrawOverlays(context)) {
+                                try {
+                                    context.startService(
+                                        Intent(
+                                            context,
+                                            AtcOverlayService::class.java
+                                        )
+                                    )
+                                    status = "ATC OVERLAY STARTED"
+                                } catch (e: Exception) {
+                                    status = "ERREUR : ${e.message}"
+                                }
+                            } else {
+                                val intent = Intent(
+                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    Uri.parse("package:${context.packageName}")
+                                )
+
+                                context.startActivity(intent)
+                                status = "AUTORISATION À ACTIVER"
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Cyan,
+                            contentColor = Background
+                        )
+                    ) {
+                        Text(
+                            "START ATC OVERLAY",
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
                     Spacer(Modifier.height(12.dp))
 
                     Text(
-                        "GROUND  •  TOWER  •  DEPARTURE  •  APPROACH",
+                        "GROUND • TOWER • DEPARTURE • APPROACH",
                         color = Color.LightGray,
                         fontSize = 11.sp
                     )
@@ -144,7 +218,9 @@ fun MiniATCApp() {
                 "SIMULATION ONLY — NOT FOR REAL FLIGHT",
                 color = Color.Gray,
                 fontSize = 10.sp,
-                modifier = Modifier.align(Alignment.CenterHorizontally)
+                modifier = Modifier.align(
+                    Alignment.CenterHorizontally
+                )
             )
         }
     }
